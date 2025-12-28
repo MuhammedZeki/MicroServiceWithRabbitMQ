@@ -4,6 +4,7 @@ import { connectMongo } from "./config/mongo.js";
 import { connectRabbit } from "./config/rabbitmq.js";
 import { setupExchanges } from "./messaging/exchanges.js";
 import { setupQueues } from "./messaging/queues.js";
+import { setupBindings } from "./messaging/bindings.js";
 
 
 
@@ -15,6 +16,7 @@ await connectRabbit();
 
 await setupExchanges();
 await setupQueues();
+await setupBindings();
 
 app.listen(PORT, () => {
     console.log(`Order Server running on port ${PORT}`)
