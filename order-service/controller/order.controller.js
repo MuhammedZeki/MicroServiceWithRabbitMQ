@@ -1,3 +1,4 @@
+import { recordFailure } from "../metrics/metrics.js";
 import { Order } from "../model/Order.model.js";
 import { publishOrderCreated } from "../services/event.publisher.js";
 
@@ -21,6 +22,7 @@ export const createOrder = async (req, res) => {
             await publishOrderCreated(order);
         } catch (error) {
             console.error("RabbitMQ bağlantısı hatası:", error);
+            recordFailure("rabbitmq_publish_error")
         }
 
         res.status(201).json({ message: true, data: order });
@@ -29,11 +31,13 @@ export const createOrder = async (req, res) => {
 
         //MongoDB dUPLİCATE kEY HATASI (11000)
         if (error.code === 11000) {
+            recordFailure("duplicate_key")
             return res.status(409).json({
                 success: false,
                 error: "Order already exists"
             });
         }
+        recordFailure("internal_server_error")
         return res.status(500).json({
             success: false,
             error: "Internal Server Error"
