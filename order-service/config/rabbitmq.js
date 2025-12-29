@@ -24,3 +24,16 @@ export async function connectRabbit() {
         throw error
     }
 }
+
+export async function rabbitClose() {
+    if (rabbitChannel) {
+        await rabbitChannel.close();
+        rabbitChannel = null;
+        console.log("RabbitMQ channel closed");
+    }
+    if (connection) {
+        await connection.close();
+        connection = null;
+        console.log("RabbitMQ connection closed");
+    }
+}

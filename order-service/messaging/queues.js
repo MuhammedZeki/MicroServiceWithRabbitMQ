@@ -1,22 +1,23 @@
 import { rabbitChannel } from "../config/rabbitmq.js"
+import { ORDER_DLQ_QUEUE, ORDER_EVENTS_EXCHANGE, ORDER_QUEUE, ORDER_RETRY_EXCHANGE, ORDER_RETRY_QUEUE } from "./constants.js";
 
 export const setupQueues = async () => {
 
     //MAIN QUEUE
-    await rabbitChannel.assertQueue("order.queue", {
+    await rabbitChannel.assertQueue(ORDER_QUEUE, {
         durable: true,
-        deadLetterExchange: "order.retry.exchange"
+        deadLetterExchange: ORDER_RETRY_EXCHANGE
     });
 
     // RETRY QUEUE
-    await rabbitChannel.assertQueue("order.retry.queue", {
+    await rabbitChannel.assertQueue(ORDER_RETRY_QUEUE, {
         durable: true,
         messageTtl: 5000,
-        deadLetterExchange: "order.events"
+        deadLetterExchange: ORDER_EVENTS_EXCHANGE
     });
 
     //DLQ
-    await rabbitChannel.assertQueue("order.dlq.queue", {
+    await rabbitChannel.assertQueue(ORDER_DLQ_QUEUE, {
         durable: true,
     });
 }

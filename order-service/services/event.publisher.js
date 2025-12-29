@@ -1,4 +1,5 @@
 import { rabbitChannel } from "../config/rabbitmq.js"
+import { ORDER_CREATED_EVENT, ORDER_EVENTS_EXCHANGE } from "../messaging/constants.js";
 
 export const publishOrderCreated = async (order) => {
     if (!rabbitChannel) {
@@ -6,9 +7,12 @@ export const publishOrderCreated = async (order) => {
         return;
     }
     rabbitChannel.publish(
-        "order.events",
-        "order.created",
+        ORDER_EVENTS_EXCHANGE,
+        ORDER_CREATED_EVENT,
         Buffer.from(JSON.stringify(order)),
-        { persistent: true } //disk yaz
+        {
+            messageId: order.orderId, //Siparişin idsini mesajın kimliği yapıyoruz her mesaja tc no veriyoruz
+            persistent: true //disk'e yaz
+        }
     )
 }

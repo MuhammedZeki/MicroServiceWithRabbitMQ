@@ -1,9 +1,8 @@
 import express from 'express'
+import { createOrder } from '../controller/order.controller.js'
 
 const router = express.Router()
 
-router.post("/", (req, res) => {
-    res.json({ message: "Order-Service" })
-})
+router.post("/create", createOrder)
 
 export default router

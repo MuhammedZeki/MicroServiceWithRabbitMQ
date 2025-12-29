@@ -1,12 +1,42 @@
 import { Order } from "../model/Order.model.js";
+import { publishOrderCreated } from "../services/event.publisher.js";
 
 export const createOrder = async (req, res) => {
-    const { orderId } = req.body;
+    try {
+        const { orderId } = req.body;
 
-    const order = await Order.create({ orderId, status: "CRATED" });
+        if (!orderId) {
+            return res.status(400).json(
+                {
+                    success: false,
+                    error: "orderId is required"
+                }
+            );
+        }
 
-    // event fırlatılacak 
+        const order = await Order.create({ orderId, status: "PENDING" });
 
-    res.status(201).json({ message: true })
+        // event fırlatılacak 
+        try {
+            await publishOrderCreated(order);
+        } catch (error) {
+            console.error("RabbitMQ bağlantısı hatası:", error);
+        }
 
+        res.status(201).json({ message: true, data: order });
+    } catch (error) {
+        console.error("Hata oluştu:", error);
+
+        //MongoDB dUPLİCATE kEY HATASI (11000)
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                error: "Order already exists"
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            error: "Internal Server Error"
+        });
+    }
 }

@@ -14,3 +14,8 @@ export async function connectMongo() {
         throw error;
     }
 }
+
+export async function mongoClose() {
+    await mongoose.connection.close();
+    console.log("MongoDB connection closed");
+}
