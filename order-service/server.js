@@ -6,6 +6,7 @@ import { setupExchanges } from "./messaging/exchanges.js";
 import { setupQueues } from "./messaging/queues.js";
 import { setupBindings } from "./messaging/bindings.js";
 import { consumeOrderPaymentEvents } from "./consumers/order-payment.consumer.js";
+import { consumePaymentStatusUpdate } from "./consumers/payment-status.consumer.js";
 
 
 
@@ -22,6 +23,7 @@ await setupBindings();
 
 //EVENTS
 await consumeOrderPaymentEvents()
+await consumePaymentStatusUpdate()
 
 const server = app.listen(PORT, () => {
     console.log(`Order Server running on port ${PORT}`)

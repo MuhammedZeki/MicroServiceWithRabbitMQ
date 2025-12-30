@@ -1,39 +1,45 @@
-import "dotenv/config"
-import { app } from "./app.js";
-import { mongoClose, connectMongo } from "./config/mongo.js";
-import { rabbitClose, connectRabbit } from "./config/rabbitMQ.js";
+import 'dotenv/config';
+import { app } from './app.js';
+import { mongoClose, connectMongo } from './config/mongo.js';
+import { rabbitClose, connectRabbit } from './config/rabbitmq.js';
 
+const PORT = process.env.PAYMENT_SERVICE_PORT || 3002;
 
+const startServer = async () => {
+    try {
+        await connectMongo();
+        await connectRabbit();
 
-const PORT = process.env.PORT || 3001
+        const server = app.listen(PORT, () => {
+            console.log(`[p-s] Payment Service running on port ${PORT}`);
+        });
 
+        const gracefulShutdown = async (signal) => {
+            console.log(`
+[p-s] ${signal} received. Closing connections...`);
 
-await connectMongo();
-await connectRabbit();
+            // Force shutdown after 10 seconds
+            const timeout = setTimeout(() => {
+                console.error('[p-s] Could not close connections in time, forcefully shutting down');
+                process.exit(1);
+            }, 10000);
 
+            server.close(async () => {
+                console.log('[p-s] HTTP server closed.');
+                await rabbitClose();
+                await mongoClose();
+                clearTimeout(timeout);
+                process.exit(0);
+            });
+        };
 
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-
-const server = app.listen(PORT, () => {
-    console.log(`Payment Server running on port ${PORT}`)
-})
-
-const gracefulShutdown = async (signal) => {
-    console.log(`\n${signal} received. Closing connections...`);
-
-    // Sigorta: Eğer 10 saniye içinde kapanmazsa zorla kapat
-    setTimeout(() => {
-        console.error("Could not close connections in time, forcefully shutting down");
+    } catch (error) {
+        console.error('[p-s] Failed to start server:', error);
         process.exit(1);
-    }, 10000);
-
-    server.close(async () => {
-        console.log("HTTP server closed.");
-        await rabbitClose();
-        await mongoClose();
-        process.exit(0);
-    });
+    }
 };
 
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+startServer();
