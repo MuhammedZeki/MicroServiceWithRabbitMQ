@@ -32,8 +32,7 @@ export const consumeOrderPaymentEvents = async () => {
                 return;
             }
 
-            //SİSTEMSEL HATA SİMULASYONU
-            
+            //SİSTEMSEL HATA SİMULASYONU          
 
             order.processedMessageIds.push(messageId);
             order.status = "PROCESSED";

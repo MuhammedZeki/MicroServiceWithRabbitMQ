@@ -9,7 +9,7 @@ const OrderSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['PENDING', 'PROCESSED', 'FAILED', 'RETRYING'], // Sadece bu değerleri alabilsin
+        enum: ['PENDING', 'COMPLETED', 'CANCELLED', 'FAILED', 'RETRYING', 'PROCESSED'], // Sadece bu değerleri alabilsin
         default: 'PENDING'
     },
     processedMessageIds: [{

@@ -7,5 +7,7 @@ export const ORDER_RETRY_EXCHANGE = "order.retry.exchange";
 export const ORDER_DLQ_EXCHANGE = "order.dlq.exchange";
 
 export const ORDER_CREATED_EVENT = "order.created";
+export const ORDER_CANCELLED_EVENT = "order.cancelled";
+
 export const ORDER_DLQ_ROUTING_KEY = "dlq";
 export const ORDER_RETRY_ROUTING_KEY = "retry";
