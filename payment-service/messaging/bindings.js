@@ -1,9 +1,15 @@
-import { Exchanges, Queues, RoutingKeys } from './constants.js';
+import { rabbitChannel } from "../config/rabbitmq.js"
+import { ORDER_EVENTS_EXCHANGE, PAYMENT_DLQ_EXCHANGE, PAYMENT_DLQ_QUEUE, PAYMENT_DLQ_ROUTING_KEY, PAYMENT_EVENTS_EXCHANGE, PAYMENT_ORDER_DLQ_EXCHANGE, PAYMENT_ORDER_DLQ_QUEUE, PAYMENT_ORDER_DLQ_ROUTING_KEY, PAYMENT_ORDER_QUEUE, PAYMENT_ORDER_RETRY_EXCHANGE, PAYMENT_ORDER_RETRY_QUEUE, PAYMENT_ORDER_RETRY_ROUTING_KEY, PAYMENT_ORDER_ROUTING_KEY, PAYMENT_QUEUE, PAYMENT_RETRY_EXCHANGE, PAYMENT_RETRY_QUEUE, PAYMENT_RETRY_ROUTING_KEY } from "./constants.js";
 
-const OrderCreatedBinding = {
-  queue: Queues.PAYMENT, //payment.queue
-  exchange: Exchanges.ORDER_EVENTS, //order.event
-  routingKey: RoutingKeys.ORDER_CREATED, //order.created
-};
+export const setupBindings = async () => {
+  await rabbitChannel.bindQueue(PAYMENT_QUEUE, PAYMENT_EVENTS_EXCHANGE, "payment.*");
+  await rabbitChannel.bindQueue(PAYMENT_RETRY_QUEUE, PAYMENT_RETRY_EXCHANGE, PAYMENT_RETRY_ROUTING_KEY);
+  await rabbitChannel.bindQueue(PAYMENT_DLQ_QUEUE, PAYMENT_DLQ_EXCHANGE, PAYMENT_DLQ_ROUTING_KEY);
 
-export const MqBindings = [OrderCreatedBinding];
+  await rabbitChannel.bindQueue(PAYMENT_ORDER_QUEUE, ORDER_EVENTS_EXCHANGE, PAYMENT_ORDER_ROUTING_KEY);
+  await rabbitChannel.bindQueue(PAYMENT_ORDER_RETRY_QUEUE, PAYMENT_ORDER_RETRY_EXCHANGE, PAYMENT_ORDER_RETRY_ROUTING_KEY);
+  await rabbitChannel.bindQueue(PAYMENT_ORDER_DLQ_QUEUE, PAYMENT_ORDER_DLQ_EXCHANGE, PAYMENT_ORDER_DLQ_ROUTING_KEY);
+
+
+
+}

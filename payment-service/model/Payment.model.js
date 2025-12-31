@@ -27,6 +27,10 @@ const paymentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  processedMessageIds: {
+    type: [String],
+    default: [],
+  },
 });
 
 // Update `updatedAt` field before saving

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { app } from './app.js';
+import { app, startMessaging } from './app.js';
 import { mongoClose, connectMongo } from './config/mongo.js';
 import { rabbitClose, connectRabbit } from './config/rabbitmq.js';
 
@@ -9,14 +9,14 @@ const startServer = async () => {
     try {
         await connectMongo();
         await connectRabbit();
+        await startMessaging(); // Setup exchanges/queues and start consumers
 
         const server = app.listen(PORT, () => {
             console.log(`[p-s] Payment Service running on port ${PORT}`);
         });
 
         const gracefulShutdown = async (signal) => {
-            console.log(`
-[p-s] ${signal} received. Closing connections...`);
+            console.log(`[p-s] ${signal} received. Closing connections...`);
 
             // Force shutdown after 10 seconds
             const timeout = setTimeout(() => {

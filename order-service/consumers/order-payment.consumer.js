@@ -17,8 +17,7 @@ export const consumeOrderPaymentEvents = async () => {
 
             //IDEMPOTENCY
             if (order.processedMessageIds.includes(messageId)) {
-                rabbitChannel.ack(msg);
-                return;
+                return rabbitChannel.ack(msg);
             }
 
             //VALİDATİON HATASI (TEKRARSIZ DİREKT DLQ)
