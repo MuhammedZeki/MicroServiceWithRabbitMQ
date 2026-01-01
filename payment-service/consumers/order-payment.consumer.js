@@ -5,7 +5,8 @@ import {
     PAYMENT_DLQ_EXCHANGE,
     PAYMENT_DLQ_ROUTING_KEY,
     PAYMENT_RETRY_EXCHANGE,
-    PAYMENT_RETRY_ROUTING_KEY
+    PAYMENT_RETRY_ROUTING_KEY,
+    PAYMENT_EVENTS_EXCHANGE
 } from '../messaging/constants.js';
 import { publishEvent } from '../services/event.publisher.js';
 import Payment from '../model/Payment.model.js';
@@ -48,9 +49,13 @@ export const consumePaymentEvents = async () => {
             // Basic validation
             if (!orderId || totalAmount === undefined) {
                 console.error('[p-s] Invalid message. Missing orderId or totalAmount. Sending to DLQ.');
-                rabbitChannel.publish(PAYMENT_DLQ_EXCHANGE, PAYMENT_DLQ_ROUTING_KEY, msg.content);
-                rabbitChannel.ack(msg);
-                return;
+                await publishEvent(
+                    PAYMENT_DLQ_EXCHANGE,
+                    PAYMENT_DLQ_ROUTING_KEY,
+                    msg.content,
+                    { messageId }
+                );
+                return rabbitChannel.ack(msg);
             }
 
             // --- Idempotency Handling ---
@@ -86,12 +91,17 @@ export const consumePaymentEvents = async () => {
             await payment.save();
 
 
-            //spesifik event yapılacak
-            await publishEvent(PAYMENT_STATUS_EVENT, {
-                orderId: payment.orderId,
-                status: payment.status,
-                message: payment.paymentGatewayMessage,
-            });
+
+            await publishEvent(
+                PAYMENT_EVENTS_EXCHANGE,
+                PAYMENT_STATUS_EVENT,
+                {
+                    orderId: payment.orderId,
+                    status: payment.status,
+                    message: payment.paymentGatewayMessage,
+                },
+                { messageId }
+            );
 
             console.log(`[p-s] Successfully processed payment for orderId: ${orderId}`);
             rabbitChannel.ack(msg);

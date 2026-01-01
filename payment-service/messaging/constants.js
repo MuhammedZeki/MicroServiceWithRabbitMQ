@@ -1,30 +1,33 @@
-//ORDER
-export const ORDER_EVENTS_EXCHANGE = 'order.events';
-
-export const PAYMENT_ORDER_QUEUE = 'payment.order.queue';
-export const PAYMENT_ORDER_RETRY_QUEUE = 'payment.order.retry.queue';
-export const PAYMENT_ORDER_DLQ_QUEUE = 'payment.order.dlq.queue';
-
-export const PAYMENT_ORDER_RETRY_EXCHANGE = 'payment.order.retry.exchange';
-export const PAYMENT_ORDER_DLQ_EXCHANGE = 'payment.order.dlq.exchange';
-
-export const PAYMENT_ORDER_RETRY_ROUTING_KEY = 'payment.order.retry';
-export const PAYMENT_ORDER_DLQ_ROUTING_KEY = 'payment.order.dlq';
-export const PAYMENT_ORDER_ROUTING_KEY = 'order.created';
-
 //PAYMENT
 
 // PAYMENT EXCHANGES
 export const PAYMENT_EVENTS_EXCHANGE = 'payment.events';
-export const PAYMENT_RETRY_EXCHANGE = 'payment.retry.exchange';
-export const PAYMENT_DLQ_EXCHANGE = 'payment.dlq.exchange';
+export const PAYMENT_INTERNAL_RETRY_EXCHANGE = 'payment.internal.retry.exchange';
+export const PAYMENT_INTERNAL_DLQ_EXCHANGE = 'payment.internal.dlq.exchange';
 
 // PAYMENT QUEUES
-export const PAYMENT_QUEUE = 'payment.queue';
-export const PAYMENT_RETRY_QUEUE = 'payment.retry.queue';
-export const PAYMENT_DLQ_QUEUE = 'payment.dlq.queue';
+export const PAYMENT_INTERNAL_QUEUE = 'payment.internal.queue';
+export const PAYMENT_INTERNAL_RETRY_QUEUE = 'payment.internal.retry.queue';
+export const PAYMENT_INTERNAL_DLQ_QUEUE = 'payment.internal.dlq.queue';
 
 // PAYMENT ROUTING KEYS
-export const PAYMENT_STATUS_EVENT = 'payment.status';
-export const PAYMENT_RETRY_ROUTING_KEY = 'payment.retry';
-export const PAYMENT_DLQ_ROUTING_KEY = 'payment.dlq';
+export const PAYMENT_INTERNAL_STATUS_EVENT = 'payment.internal.status';
+export const PAYMENT_INTERNAL_RETRY_ROUTING_KEY = 'payment.internal.retry';
+export const PAYMENT_INTERNAL_DLQ_ROUTING_KEY = 'payment.internal.dlq';
+
+
+
+
+//ORDER
+export const ORDER_EVENTS_EXCHANGE = 'order.events';
+
+export const ORDER_INBOUND_QUEUE = 'order.inbound.queue';
+export const ORDER_INBOUND_RETRY_QUEUE = 'order.inbound.retry.queue';
+export const ORDER_INBOUND_DLQ_QUEUE = 'order.inbound.dlq.queue';
+
+export const ORDER_INBOUND_RETRY_EXCHANGE = 'order.inbound.retry.exchange';
+export const ORDER_INBOUND_DLQ_EXCHANGE = 'order.inbound.dlq.exchange';
+
+export const ORDER_INBOUND_RETRY_ROUTING_KEY = 'order.inbound.retry';
+export const ORDER_INBOUND_DLQ_ROUTING_KEY = 'order.inbound.dlq';
+export const ORDER_CREATED_EVENT = 'order.created';

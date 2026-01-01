@@ -1,24 +1,25 @@
 import { rabbitChannel } from "../config/rabbitmq.js"
-import { ORDER_EVENTS_EXCHANGE, PAYMENT_DLQ_QUEUE, PAYMENT_EVENTS_EXCHANGE, PAYMENT_ORDER_DLQ_QUEUE, PAYMENT_ORDER_QUEUE, PAYMENT_ORDER_RETRY_EXCHANGE, PAYMENT_ORDER_RETRY_QUEUE, PAYMENT_ORDER_RETRY_ROUTING_KEY, PAYMENT_ORDER_ROUTING_KEY, PAYMENT_QUEUE, PAYMENT_RETRY_EXCHANGE, PAYMENT_RETRY_QUEUE, PAYMENT_RETRY_ROUTING_KEY } from "./constants.js";
+import { ORDER_INBOUND_DLQ_QUEUE, ORDER_INBOUND_QUEUE, ORDER_INBOUND_RETRY_EXCHANGE, ORDER_INBOUND_RETRY_QUEUE, ORDER_INBOUND_RETRY_ROUTING_KEY, PAYMENT_INTERNAL_DLQ_QUEUE, PAYMENT_INTERNAL_QUEUE, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_QUEUE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY } from "./constants.js";
 
 export const setupQueues = async () => {
 
-    //MAIN QUEUE
-    await rabbitChannel.assertQueue(PAYMENT_QUEUE, {
+    //MAIN QUEUE(PAYMENT)
+    await rabbitChannel.assertQueue(PAYMENT_INTERNAL_QUEUE, {
         durable: true,
-        deadLetterExchange: PAYMENT_RETRY_EXCHANGE,
-        deadLetterRoutingKey: PAYMENT_RETRY_ROUTING_KEY
+        deadLetterExchange: PAYMENT_INTERNAL_RETRY_EXCHANGE,
+        deadLetterRoutingKey: PAYMENT_INTERNAL_RETRY_ROUTING_KEY
     });
 
     // RETRY QUEUE
-    await rabbitChannel.assertQueue(PAYMENT_RETRY_QUEUE, {
+    await rabbitChannel.assertQueue(PAYMENT_INTERNAL_RETRY_QUEUE, {
         durable: true,
         messageTtl: 5000,
-        deadLetterExchange: PAYMENT_EVENTS_EXCHANGE
+        deadLetterExchange: "",
+        deadLetterRoutingKey: PAYMENT_INTERNAL_QUEUE
     });
 
     //DLQ
-    await rabbitChannel.assertQueue(PAYMENT_DLQ_QUEUE, {
+    await rabbitChannel.assertQueue(PAYMENT_INTERNAL_DLQ_QUEUE, {
         durable: true,
     });
 
@@ -26,20 +27,22 @@ export const setupQueues = async () => {
 
 
     //MAİN
-    await rabbitChannel.assertQueue(PAYMENT_ORDER_QUEUE, {
+    await rabbitChannel.assertQueue(ORDER_INBOUND_QUEUE, {
         durable: true,
-        deadLetterExchange: PAYMENT_ORDER_RETRY_EXCHANGE,
-        deadLetterRoutingKey: PAYMENT_ORDER_RETRY_ROUTING_KEY
+        deadLetterExchange: ORDER_INBOUND_RETRY_EXCHANGE,
+        deadLetterRoutingKey: ORDER_INBOUND_RETRY_ROUTING_KEY
     })
 
-    await rabbitChannel.assertQueue(PAYMENT_ORDER_RETRY_QUEUE, {
+
+    //Kardeşim, bu mesajla kimseyi uğraştırma, routing key kısmına yazdığım isme sahip kuyruğa sessizce bırak.
+    await rabbitChannel.assertQueue(ORDER_INBOUND_RETRY_QUEUE, {
         durable: true,
         messageTtl: 5000,
-        deadLetterExchange: ORDER_EVENTS_EXCHANGE,
-        deadLetterRoutingKey: PAYMENT_ORDER_ROUTING_KEY,
+        deadLetterExchange: "",// "Beni kimseye duyurma, sessizce ilet"
+        deadLetterRoutingKey: ORDER_INBOUND_QUEUE,// "Direkt bu kuyruğun içine bırak"
     })
 
-    await rabbitChannel.assertQueue(PAYMENT_ORDER_DLQ_QUEUE, {
+    await rabbitChannel.assertQueue(ORDER_INBOUND_DLQ_QUEUE, {
         durable: true,
     })
 }
