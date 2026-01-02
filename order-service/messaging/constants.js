@@ -13,6 +13,10 @@ export const ORDER_INTERNAL_CANCELLED_EVENT = "order.internal.cancelled";
 export const ORDER_INTERNAL_DLQ_ROUTING_KEY = "order.internal.dlq";
 export const ORDER_INTERNAL_RETRY_ROUTING_KEY = "order.internal.retry";
 
+export const ORDER_CANCELLED_EVENT = "order.cancelled";
+export const ORDER_CREATED_EVENT = "order.created";
+
+
 
 //PAYMENT
 export const PAYMENT_EVENTS_EXCHANGE = "payment.events";

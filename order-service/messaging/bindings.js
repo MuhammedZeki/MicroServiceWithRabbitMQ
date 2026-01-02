@@ -4,7 +4,8 @@ import { ORDER_EVENTS_EXCHANGE, ORDER_INTERNAL_DLQ_EXCHANGE, ORDER_INTERNAL_DLQ_
 export const setupBindings = async () => {
 
     //ORDER
-    await rabbitChannel.bindQueue(ORDER_INTERNAL_QUEUE, ORDER_EVENTS_EXCHANGE, "order.internal.*");
+    //  order.# ---> order.created, order.cancelled, order.internal.hersey
+    await rabbitChannel.bindQueue(ORDER_INTERNAL_QUEUE, ORDER_EVENTS_EXCHANGE, "order.#");
     await rabbitChannel.bindQueue(ORDER_INTERNAL_RETRY_QUEUE, ORDER_INTERNAL_RETRY_EXCHANGE, ORDER_INTERNAL_RETRY_ROUTING_KEY);
     await rabbitChannel.bindQueue(ORDER_INTERNAL_DLQ_QUEUE, ORDER_INTERNAL_DLQ_EXCHANGE, ORDER_INTERNAL_DLQ_ROUTING_KEY);
 

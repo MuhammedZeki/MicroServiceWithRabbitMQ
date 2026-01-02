@@ -24,9 +24,6 @@ export const setupQueues = async () => {
     });
 
 
-
-
-
     // Order-Payment Queue
     await rabbitChannel.assertQueue(PAYMENT_INBOUND_QUEUE, {
         durable: true,

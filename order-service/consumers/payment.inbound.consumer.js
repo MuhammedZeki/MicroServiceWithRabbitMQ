@@ -1,14 +1,14 @@
 import { rabbitChannel } from '../config/rabbitmq.js';
-import { ORDER_PAYMENT_DLQ_EXCHANGE, ORDER_PAYMENT_DLQ_ROUTING_KEY, ORDER_PAYMENT_QUEUE, ORDER_PAYMENT_RETRY_EXCHANGE, ORDER_PAYMENT_RETRY_ROUTING_KEY } from '../messaging/constants.js';
+import { PAYMENT_INBOUND_DLQ_EXCHANGE, PAYMENT_INBOUND_DLQ_ROUTING_KEY, PAYMENT_INBOUND_QUEUE, PAYMENT_INBOUND_RETRY_EXCHANGE, PAYMENT_INBOUND_RETRY_ROUTING_KEY } from '../messaging/constants.js';
 import { Order } from '../model/Order.model.js';
 
-export const consumePaymentStatusUpdate = async () => {
+export const consumeInboundPaymentEvents = async () => {
   if (!rabbitChannel) {
     console.error('[o-s] RabbitMQ channel is not available. Cannot consume event.');
     return;
   }
 
-  rabbitChannel.consume(ORDER_PAYMENT_QUEUE, async (msg) => {
+  rabbitChannel.consume(PAYMENT_INBOUND_QUEUE, async (msg) => {
     if (msg === null) return;
 
 
@@ -17,18 +17,27 @@ export const consumePaymentStatusUpdate = async () => {
     const MAX_RETRIES = 3;
 
 
+    //PAYMENT SERVİSDEN HATA GELİYOR payment.internal'ın catch'den
+    // {
+    //   orderId: data?.orderId || payment?.orderId,
+    //   status: 'PAYMENT_FAILURE', // Order servisi bunu alınca siparişi iptal edecek
+    //   message: `Payment failed after ${MAX_RETRIES} attempts.`,
+    //}
+    let orderId, status, message;
+
     try {
       const rawData = msg.content.toString();
-      console.log("[o-s] Ham mesaj geldi:", rawData); // Gelen paketin içinde ne var canlı görürüz
-      const { orderId, status, message } = JSON.parse(rawData);
-
+      const parsedData = JSON.parse(rawData); // Parse işlemini try içinde yapıyoruz!
+      orderId = parsedData.orderId;
+      status = parsedData.status;
+      message = parsedData.message;
 
       //sendToDlq
       if (!orderId || !status) {
         console.error('Invalid message format. Missing orderId or status.');
         rabbitChannel.publish(
-          ORDER_PAYMENT_DLQ_EXCHANGE,
-          ORDER_PAYMENT_DLQ_ROUTING_KEY,
+          PAYMENT_INBOUND_DLQ_EXCHANGE,
+          PAYMENT_INBOUND_DLQ_ROUTING_KEY,
           msg.content
         )
         return rabbitChannel.ack(msg);
@@ -37,13 +46,22 @@ export const consumePaymentStatusUpdate = async () => {
       const order = await Order.findOne({ orderId: orderId });
       if (!order) {
         //order servis db yazma işlemini yavaş sürebilir o yüzden retry aıyoruz payment işini hızlı bitirdi çünkü
-        console.error(`Order with orderId ${orderId} not found.`);
-        rabbitChannel.publish(
-          ORDER_PAYMENT_RETRY_EXCHANGE,
-          ORDER_PAYMENT_RETRY_ROUTING_KEY,
-          msg.content
-        )
-        return rabbitChannel.ack(msg);
+        if (retryCount >= MAX_RETRIES) {
+          rabbitChannel.publish(
+            PAYMENT_INBOUND_DLQ_EXCHANGE,
+            PAYMENT_INBOUND_DLQ_ROUTING_KEY,
+            msg.content
+          );
+          return rabbitChannel.ack(msg);
+        } else {
+          console.error(`Order with orderId ${orderId} not found.`);
+          rabbitChannel.publish(
+            PAYMENT_INBOUND_RETRY_EXCHANGE,
+            PAYMENT_INBOUND_RETRY_ROUTING_KEY,
+            msg.content
+          )
+          return rabbitChannel.ack(msg);
+        }
       }
 
       if (['COMPLETED', 'FAILED'].includes(order.status)) {
@@ -72,18 +90,34 @@ export const consumePaymentStatusUpdate = async () => {
       rabbitChannel.ack(msg);
     } catch (error) {
       if (retryCount >= MAX_RETRIES) {
+
+        // 1. Önce Order Service'e "Kral biz denedik ama ödeme patladı" diyoruz.
+        if (orderId) {
+          await publishEvent(
+            PAYMENT_EVENTS_EXCHANGE,
+            PAYMENT_STATUS_EVENT,
+            {
+              orderId: orderId,
+              status: 'PAYMENT_FAILURE', // Order bunu alınca siparişi iptal eder
+              message: `Payment failed after ${MAX_RETRIES} attempts: ${error.message}`
+            }
+          );
+        }
+
+
+        // 2. Sonra teknik inceleme için mezarlığa (DLQ) atıyoruz.
         console.error(`[o-s] Max retry doldu. Sipariş ${orderId} DLQ'ya gidiyor.`);
         rabbitChannel.publish(
-          ORDER_PAYMENT_DLQ_EXCHANGE,
-          ORDER_PAYMENT_DLQ_ROUTING_KEY,
+          PAYMENT_INBOUND_DLQ_EXCHANGE,
+          PAYMENT_INBOUND_DLQ_ROUTING_KEY,
           msg.content
         );
         rabbitChannel.ack(msg);
 
       } else {
         rabbitChannel.publish(
-          ORDER_PAYMENT_RETRY_EXCHANGE,
-          ORDER_PAYMENT_RETRY_ROUTING_KEY,
+          PAYMENT_INBOUND_RETRY_EXCHANGE,
+          PAYMENT_INBOUND_RETRY_ROUTING_KEY,
           msg.content,
           { headers: { 'x-retries': retryCount + 1 } }
         );

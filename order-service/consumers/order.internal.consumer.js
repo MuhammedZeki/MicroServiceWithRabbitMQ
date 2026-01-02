@@ -1,10 +1,10 @@
 import { rabbitChannel } from "../config/rabbitmq.js"
+import { ORDER_INTERNAL_DLQ_EXCHANGE, ORDER_INTERNAL_DLQ_ROUTING_KEY, ORDER_INTERNAL_QUEUE, ORDER_INTERNAL_RETRY_EXCHANGE, ORDER_INTERNAL_RETRY_ROUTING_KEY } from "../messaging/constants.js";
 import { recordFailure } from "../metrics/metrics.js";
 import { Order } from "../model/Order.model.js";
-import { ORDER_DLQ_EXCHANGE, ORDER_DLQ_ROUTING_KEY, ORDER_QUEUE, ORDER_RETRY_EXCHANGE, ORDER_RETRY_ROUTING_KEY } from "../messaging/constants.js";
 
-export const consumeOrderPaymentEvents = async () => {
-    rabbitChannel.consume(ORDER_QUEUE, async (msg) => {
+export const consumeInternalOrderEvents = async () => {
+    rabbitChannel.consume(ORDER_INTERNAL_QUEUE, async (msg) => {
         if (!msg) return;
 
         const data = JSON.parse(msg.content.toString());
@@ -13,23 +13,39 @@ export const consumeOrderPaymentEvents = async () => {
 
 
         try {
+            //VALİDATİON HATASI (TEKRARSIZ DİREKT DLQ)
+            if (!data.orderId) {
+                rabbitChannel.publish(
+                    ORDER_INTERNAL_DLQ_EXCHANGE,
+                    ORDER_INTERNAL_DLQ_ROUTING_KEY,
+                    msg.content
+                );
+                rabbitChannel.ack(msg);
+                return;
+            }
+
+
             const order = await Order.findOne({ orderId: data.orderId });
+
+
+            if (!order) {
+                if (retryCount >= 5) {
+                    console.error(`Sipariş ${data.orderId} bulunamadı ve max retry doldu. DLQ'ya gidiyor.`);
+                    rabbitChannel.publish(ORDER_INTERNAL_DLQ_EXCHANGE, ORDER_INTERNAL_DLQ_ROUTING_KEY, msg.content);
+                } else {
+                    console.log(`Sipariş henüz DB'de yok, retry atılıyor... Sayı: ${retryCount + 1}`);
+                    rabbitChannel.publish(ORDER_INTERNAL_RETRY_EXCHANGE, ORDER_INTERNAL_RETRY_ROUTING_KEY, msg.content, {
+                        headers: { "x-retries": retryCount + 1 }
+                    });
+                }
+                return rabbitChannel.ack(msg);
+            }
 
             //IDEMPOTENCY
             if (order.processedMessageIds.includes(messageId)) {
                 return rabbitChannel.ack(msg);
             }
 
-            //VALİDATİON HATASI (TEKRARSIZ DİREKT DLQ)
-            if (!data.orderId) {
-                rabbitChannel.publish(
-                    ORDER_DLQ_EXCHANGE,
-                    ORDER_DLQ_ROUTING_KEY,
-                    msg.content
-                );
-                rabbitChannel.ack(msg);
-                return;
-            }
 
             //SİSTEMSEL HATA SİMULASYONU          
 
@@ -46,8 +62,8 @@ export const consumeOrderPaymentEvents = async () => {
             if (retryCount >= 5) {
                 console.error(`Max retries reached for message: ${messageId}. Sending to DLQ.`);
                 rabbitChannel.publish(
-                    ORDER_DLQ_EXCHANGE,
-                    ORDER_DLQ_ROUTING_KEY,
+                    ORDER_INTERNAL_DLQ_EXCHANGE,
+                    ORDER_INTERNAL_DLQ_ROUTING_KEY,
                     msg.content
                 );
                 rabbitChannel.ack(msg);
@@ -55,8 +71,8 @@ export const consumeOrderPaymentEvents = async () => {
             } else {
                 console.log(`Retrying message: ${messageId}. Retry count: ${retryCount + 1}`);
                 rabbitChannel.publish(
-                    ORDER_RETRY_EXCHANGE,
-                    ORDER_RETRY_ROUTING_KEY,
+                    ORDER_INTERNAL_RETRY_EXCHANGE,
+                    ORDER_INTERNAL_RETRY_ROUTING_KEY,
                     msg.content,
                     { headers: { "x-retries": retryCount + 1 } }
                 )

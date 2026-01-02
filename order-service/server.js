@@ -5,8 +5,8 @@ import { rabbitClose, connectRabbit } from "./config/rabbitmq.js";
 import { setupExchanges } from "./messaging/exchanges.js";
 import { setupQueues } from "./messaging/queues.js";
 import { setupBindings } from "./messaging/bindings.js";
-import { consumeOrderPaymentEvents } from "./consumers/order-payment.consumer.js";
-import { consumePaymentStatusUpdate } from "./consumers/payment-status.consumer.js";
+import { consumeInboundPaymentEvents } from "./consumers/payment.inbound.consumer.js";
+import { consumeInternalOrderEvents } from "./consumers/order.internal.consumer.js";
 
 
 
@@ -22,8 +22,8 @@ await setupBindings();
 
 
 //EVENTS
-await consumeOrderPaymentEvents()
-await consumePaymentStatusUpdate()
+await consumeInternalOrderEvents()
+await consumeInboundPaymentEvents()
 
 const server = app.listen(PORT, () => {
     console.log(`Order Server running on port ${PORT}`)

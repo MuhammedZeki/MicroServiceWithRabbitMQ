@@ -1,23 +1,13 @@
 import { rabbitChannel } from '../config/rabbitmq.js';
-import {
-    PAYMENT_QUEUE,
-    PAYMENT_STATUS_EVENT,
-    PAYMENT_DLQ_EXCHANGE,
-    PAYMENT_DLQ_ROUTING_KEY,
-    PAYMENT_RETRY_EXCHANGE,
-    PAYMENT_RETRY_ROUTING_KEY,
-    PAYMENT_EVENTS_EXCHANGE
-} from '../messaging/constants.js';
+
 import { publishEvent } from '../services/event.publisher.js';
 import Payment from '../model/Payment.model.js';
+import { PAYMENT_INTERNAL_DLQ_EXCHANGE, PAYMENT_INTERNAL_DLQ_ROUTING_KEY, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY } from '../messaging/constants.js';
 
 const FAKE_PAYMENT_SUCCESS_RATE = 0.5; // 50% success rate to test retries
 const MAX_RETRIES = 3;
 
-/**
- * Simulates a payment processing.
- * @returns {{success: boolean, message: string}}
- */
+
 const processFakePayment = () => {
     const isSuccess = Math.random() < FAKE_PAYMENT_SUCCESS_RATE;
     return {
@@ -37,7 +27,7 @@ export const consumePaymentEvents = async () => {
     rabbitChannel.consume(PAYMENT_QUEUE, async (msg) => {
         if (msg === null) return;
 
-        let data;
+        let data = JSON.parse(msg.content.toString());
         let payment;
         const messageId = msg.properties.messageId || new Date().getTime().toString(); // Fallback for messageId
         const retryCount = msg.properties.headers["x-retries"] || 0;
@@ -50,8 +40,8 @@ export const consumePaymentEvents = async () => {
             if (!orderId || totalAmount === undefined) {
                 console.error('[p-s] Invalid message. Missing orderId or totalAmount. Sending to DLQ.');
                 await publishEvent(
-                    PAYMENT_DLQ_EXCHANGE,
-                    PAYMENT_DLQ_ROUTING_KEY,
+                    PAYMENT_INTERNAL_DLQ_EXCHANGE,
+                    PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
                     msg.content,
                     { messageId }
                 );
@@ -61,12 +51,7 @@ export const consumePaymentEvents = async () => {
             // --- Idempotency Handling ---
             payment = await Payment.findOne({ orderId: orderId });
 
-            if (payment && payment.processedMessageIds.includes(messageId)) {
-                console.log(`[p-s] Message ${messageId} already processed for order ${orderId}. Skipping.`);
-                rabbitChannel.ack(msg);
-                return;
-            }
-
+            ///ödeme oluşturuyoruz kullanııcıya
             if (!payment) {
                 payment = new Payment({
                     orderId: orderId,
@@ -74,6 +59,14 @@ export const consumePaymentEvents = async () => {
                     status: 'PENDING',
                     processedMessageIds: []
                 });
+            }
+
+
+
+            if (payment && payment.processedMessageIds.includes(messageId)) {
+                console.log(`[p-s] Message ${messageId} already processed for order ${orderId}. Skipping.`);
+                rabbitChannel.ack(msg);
+                return;
             }
 
             // --- Business Logic ---
@@ -110,7 +103,7 @@ export const consumePaymentEvents = async () => {
             console.error(`[p-s] Error processing payment for order ${data?.orderId}: ${error.message}`);
 
             if (retryCount >= MAX_RETRIES) {
-                // --- Dead Lettering ---
+
                 console.error(`[p-s] Max retries reached for message ${messageId}. Sending to DLQ.`);
                 if (payment) {
                     payment.status = 'PAYMENT_FAILURE';
@@ -119,26 +112,42 @@ export const consumePaymentEvents = async () => {
                         payment.processedMessageIds.push(messageId);
                     }
                     await payment.save();
-
-                    await publishEvent(PAYMENT_STATUS_EVENT, {
-                        orderId: payment.orderId,
-                        status: payment.status,
-                        message: payment.paymentGatewayMessage,
-                    });
                 }
-                rabbitChannel.publish(PAYMENT_DLQ_EXCHANGE, PAYMENT_DLQ_ROUTING_KEY, msg.content, { messageId });
-                rabbitChannel.ack(msg);
+
+                // ORDER SERVİSİNE HABER VER ---
+                await publishEvent(
+                    PAYMENT_EVENTS_EXCHANGE,
+                    PAYMENT_STATUS_EVENT,
+                    {
+                        orderId: data?.orderId || payment?.orderId,
+                        status: 'PAYMENT_FAILURE', // Order servisi bunu alınca siparişi iptal edecek
+                        message: `Payment failed after ${MAX_RETRIES} attempts.`,
+                    },
+                    { messageId }
+                );
+
+                await publishEvent(
+                    PAYMENT_INTERNAL_DLQ_EXCHANGE,
+                    PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
+                    msg.content,
+                    { messageId }
+                );
+                return rabbitChannel.ack(msg);
             } else {
                 // --- Retry ---
                 console.log(`[p-s] Retrying message ${messageId}. Retry count: ${retryCount + 1}`);
-                rabbitChannel.publish(PAYMENT_RETRY_EXCHANGE, PAYMENT_RETRY_ROUTING_KEY, msg.content, {
-                    headers: { "x-retries": retryCount + 1 },
-                    messageId: messageId
-                });
-                rabbitChannel.ack(msg); // Ack original message
+                await publishEvent(
+                    PAYMENT_INTERNAL_RETRY_EXCHANGE,
+                    PAYMENT_INTERNAL_RETRY_ROUTING_KEY,
+                    msg.content,
+                    {
+                        headers: { "x-retries": retryCount + 1 },
+                        messageId
+                    });
+                return rabbitChannel.ack(msg); // Ack original message
             }
         }
     }, {
-        noAck: false
+        noAck: false //Sana söz veriyorum, mesajı işleyince sana 'tamam' (Ack) veya 'hata' (Nack/Reject) diye haber vereceğim. Ben haber vermeden sen bu mesajı silme!
     });
 };
