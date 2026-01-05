@@ -1,25 +1,39 @@
+import { v4 as uuidv4 } from 'uuid';
 import { rabbitChannel } from '../config/rabbitmq.js';
 
 
 export const publishEvent = async (exchange, routingKey, data, options = {}) => {
   if (!rabbitChannel) {
-    console.error('RabbitMQ channel is not available. Cannot publish event.');
+    console.error('[p-s] RabbitMQ channel is not available.');
     return;
   }
 
   try {
-    const message = Buffer.from(JSON.stringify(data));
-    const messageId = options.messageId || new Date().getTime().toString(); // Simple unique ID
+    // 1. 🛡️ ZARFLAMA (CloudEvent Formatı)
+    // Eğer gelen data zaten bir zarf değilse, burada otomatik sarıyoruz.
+    const cloudEventEnvelope = {
+      specversion: "1.0",
+      id: options.messageId || uuidv4(), // Dışarıdan ID gelmezse biz üretiriz
+      type: options.type || `com.ecommerce.event.${routingKey}`, // Event tipi (opsiyonel)
+      source: options.source || "/services/payment-service",      // Kaynak servis
+      time: new Date().toISOString(),
+      datacontenttype: "application/json",
+      data: data // Asıl gönderdiğin obje buraya girer
+    };
 
-    rabbitChannel.publish(exchange, routingKey, message, {
-      persistent: true, //Elektrik kesilirse bu mesajı sakla
+    const _data = Buffer.from(JSON.stringify(cloudEventEnvelope));
+
+    // 2. 🚀 PUBLISH
+    rabbitChannel.publish(exchange, routingKey, _data, {
+      persistent: true,
       contentType: 'application/json',
-      messageId: messageId,
+      messageId: cloudEventEnvelope.id, // RabbitMQ header'ına da ID'yi yazıyoruz
+      headers: options.headers || {},    // Retry/X-retries header'ları için
       ...options
     });
 
-    console.log(`[p-s] Event published with key '${routingKey}' and messageId '${messageId}':`, data);
+    console.log(`[p-s] [CloudEvent] '${routingKey}' anahtarıyla fırlatıldı. ID: ${cloudEventEnvelope.id}`);
   } catch (error) {
-    console.error(`[p-s] Error publishing event with key '${routingKey}':`, error);
+    console.error(`[p-s] Publish hatası (${routingKey}):`, error);
   }
 };

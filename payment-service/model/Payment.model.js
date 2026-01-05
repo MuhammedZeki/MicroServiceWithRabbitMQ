@@ -9,7 +9,7 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['PENDING', 'PAYMENT_SUCCESS', 'PAYMENT_FAILURE'],
+    enum: ['PENDING', 'PAYMENT_SUCCESS', 'PAYMENT_FAILURE', "REFUNDED", "CANCELLED"],
     default: 'PENDING',
   },
   amount: {
@@ -19,19 +19,11 @@ const paymentSchema = new mongoose.Schema({
   paymentGatewayMessage: {
     type: String,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
   processedMessageIds: {
     type: [String],
     default: [],
   },
-});
+}, { timestamps: true });
 
 // Update `updatedAt` field before saving
 paymentSchema.pre('save', function (next) {

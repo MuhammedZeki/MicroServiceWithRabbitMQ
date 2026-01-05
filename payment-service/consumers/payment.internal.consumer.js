@@ -2,7 +2,7 @@ import { rabbitChannel } from '../config/rabbitmq.js';
 
 import { publishEvent } from '../services/event.publisher.js';
 import Payment from '../model/Payment.model.js';
-import { PAYMENT_INTERNAL_DLQ_EXCHANGE, PAYMENT_INTERNAL_DLQ_ROUTING_KEY, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY } from '../messaging/constants.js';
+import { PAYMENT_INTERNAL_DLQ_EXCHANGE, PAYMENT_INTERNAL_DLQ_ROUTING_KEY, PAYMENT_INTERNAL_QUEUE, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY } from '../messaging/constants.js';
 
 const FAKE_PAYMENT_SUCCESS_RATE = 0.5; // 50% success rate to test retries
 const MAX_RETRIES = 3;
@@ -22,9 +22,9 @@ export const consumePaymentEvents = async () => {
         return;
     }
 
-    console.log(`[p-s] Waiting for messages in queue: ${PAYMENT_QUEUE}`);
+    console.log(`[p-s] Waiting for messages in queue: ${PAYMENT_INTERNAL_QUEUE}`);
 
-    rabbitChannel.consume(PAYMENT_QUEUE, async (msg) => {
+    rabbitChannel.consume(PAYMENT_INTERNAL_QUEUE, async (msg) => {
         if (msg === null) return;
 
         let data = JSON.parse(msg.content.toString());
@@ -51,11 +51,11 @@ export const consumePaymentEvents = async () => {
             // --- Idempotency Handling ---
             payment = await Payment.findOne({ orderId: orderId });
 
-            ///ödeme oluşturuyoruz kullanııcıya
+            ///ödeme oluşturuyoruz kullanıcıya
             if (!payment) {
                 payment = new Payment({
                     orderId: orderId,
-                    amount: totalAmount,
+                    amount: totalAmount || 0,
                     status: 'PENDING',
                     processedMessageIds: []
                 });
