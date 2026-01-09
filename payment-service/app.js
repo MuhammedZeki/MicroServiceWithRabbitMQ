@@ -1,9 +1,10 @@
 import express from 'express';
 import paymentRoutes from './routes/payment.route.js';
-import { consumePaymentEvents } from './consumers/order-payment.consumer.js';
 import { setupExchanges } from './messaging/exchanges.js';
 import { setupQueues } from './messaging/queues.js';
 import { setupBindings } from './messaging/bindings.js';
+import { consumePaymentEvents } from './consumers/payment.internal.consumer.js';
+import { consumerInboundOrderEvents } from './consumers/order.inbound.consumer.js';
 
 export const app = express();
 
@@ -24,6 +25,10 @@ export const startMessaging = async () => {
         consumePaymentEvents().catch(err => {
             console.error("[p-s] Error starting consumer:", err);
             process.exit(1);
+        });
+
+        consumerInboundOrderEvents().catch(err => {
+            console.error("[p-s] Error starting inbound order consumer:", err);
         });
     } catch (error) {
         console.error("[p-s] Error during messaging setup:", error);

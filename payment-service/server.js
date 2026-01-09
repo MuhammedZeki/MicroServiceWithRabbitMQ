@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import { app, startMessaging } from './app.js';
 import { mongoClose, connectMongo } from './config/mongo.js';
-import { rabbitClose, connectRabbit } from './config/rabbitmq.js';
+import { startRabbitMQ } from './config/rabbitmq.js';
 
 const PORT = process.env.PAYMENT_SERVICE_PORT || 3002;
 
 const startServer = async () => {
     try {
         await connectMongo();
-        await connectRabbit();
+        await startRabbitMQ();
         await startMessaging(); // Setup exchanges/queues and start consumers
 
         const server = app.listen(PORT, () => {

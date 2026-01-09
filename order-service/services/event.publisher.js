@@ -79,7 +79,7 @@ export const publishOrderCancelled = async (order) => {
         {
             messageId: cloudEvent.id,
             persistent: true,
-            headers: { "trace-id": `tr-${uuidv4()}` }
+            headers: { "x-trace-id": `tr-${uuidv4()}` }
         }
     );
     console.log(`CloudEvent fırlatıldı (ID: ${cloudEvent.id})`)

@@ -1,7 +1,7 @@
 import "dotenv/config"
 import { app } from "./app.js";
 import { mongoClose, connectMongo } from "./config/mongo.js";
-import { rabbitClose, connectRabbit } from "./config/rabbitmq.js";
+import { startRabbitMQ } from "./config/rabbitmq.js";
 import { setupExchanges } from "./messaging/exchanges.js";
 import { setupQueues } from "./messaging/queues.js";
 import { setupBindings } from "./messaging/bindings.js";
@@ -10,11 +10,11 @@ import { consumeInternalOrderEvents } from "./consumers/order.internal.consumer.
 
 
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3005
 
 
 await connectMongo();
-await connectRabbit();
+await startRabbitMQ();
 
 await setupExchanges();
 await setupQueues();

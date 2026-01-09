@@ -11,6 +11,7 @@ export const PAYMENT_INTERNAL_RETRY_QUEUE = 'payment.internal.retry.queue';
 export const PAYMENT_INTERNAL_DLQ_QUEUE = 'payment.internal.dlq.queue';
 
 // PAYMENT ROUTING KEYS
+export const PAYMENT_STATUS_EVENT = 'payment.status';
 export const PAYMENT_INTERNAL_STATUS_EVENT = 'payment.internal.status';
 export const PAYMENT_INTERNAL_RETRY_ROUTING_KEY = 'payment.internal.retry';
 export const PAYMENT_INTERNAL_DLQ_ROUTING_KEY = 'payment.internal.dlq';

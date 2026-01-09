@@ -5,6 +5,7 @@ import { Order } from "../model/Order.model.js";
 
 export const consumeInternalOrderEvents = async () => {
     rabbitChannel.consume(ORDER_INTERNAL_QUEUE, async (msg) => {
+        console.log("!!!!!!!! MESAJ GELDİ !!!!!!!!!");
         if (!msg) return;
 
         const data = JSON.parse(msg.content.toString());

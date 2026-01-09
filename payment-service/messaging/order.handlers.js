@@ -1,6 +1,6 @@
 import Payment from "../model/Payment.model.js";
 import { publishEvent } from "../services/event.publisher.js";
-import { PAYMENT_EVENTS_EXCHANGE } from "./constants";
+import { PAYMENT_EVENTS_EXCHANGE } from "./constants.js";
 
 export const handleOrderCreated = async (data, payment, messageId) => {
     const newPayment = new Payment({

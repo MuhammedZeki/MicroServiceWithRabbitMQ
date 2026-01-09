@@ -9,6 +9,7 @@ export const consumeInboundPaymentEvents = async () => {
   }
 
   rabbitChannel.consume(PAYMENT_INBOUND_QUEUE, async (msg) => {
+    console.log("!!!!!!!! MESAJ GELDİ !!!!!!!!!");
     if (msg === null) return;
 
 

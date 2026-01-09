@@ -12,13 +12,13 @@ const EVENT_MAP = {
 
 export const consumerInboundOrderEvents = async () => {
     rabbitChannel.consume(ORDER_INBOUND_QUEUE, async (msg) => {
+        console.log("!!!!!!!! MESAJ GELDİ !!!!!!!!!");
+
         if (!msg) return;
 
         const envelope = JSON.parse(msg.content.toString());
         const { id, type, time, data } = envelope;
-
-
-        const messageId = msg.properties.messageId || id || uuidv4();
+        const messageId = msg.properties.messageId || id
         const { orderId, status } = data;
         const retryCount = msg.properties.headers["x-retries"] || 0;
 
@@ -27,7 +27,7 @@ export const consumerInboundOrderEvents = async () => {
             // 1. Önce veri geçerli mi bak (DB öncesi)
             if (!orderId) {
                 console.error("[p-s] Geçersiz mesaj: orderId eksik.");
-                await publishEvent(ORDER_INBOUND_DLQ_EXCHANGE, ORDER_INBOUND_DLQ_ROUTING_KEY, envelope, { messageId });
+                await publishEvent(ORDER_INBOUND_DLQ_EXCHANGE, ORDER_INBOUND_DLQ_ROUTING_KEY, data, { messageId });
                 return rabbitChannel.ack(msg);
             }
 
@@ -38,9 +38,9 @@ export const consumerInboundOrderEvents = async () => {
             // Eğer kayıt yoksa ama bu bir "Created" mesajıysa, yoluna devam et (Kayıt açılacak).
             if (!payment && type === "com.ecommerce.order.cancelled") {
                 if (retryCount >= 3) {
-                    await publishEvent(ORDER_INBOUND_DLQ_EXCHANGE, ORDER_INBOUND_DLQ_ROUTING_KEY, envelope, { messageId });
+                    await publishEvent(ORDER_INBOUND_DLQ_EXCHANGE, ORDER_INBOUND_DLQ_ROUTING_KEY, data, { messageId });
                 } else {
-                    await publishEvent(ORDER_INBOUND_RETRY_EXCHANGE, ORDER_INBOUND_RETRY_ROUTING_KEY, envelope, {
+                    await publishEvent(ORDER_INBOUND_RETRY_EXCHANGE, ORDER_INBOUND_RETRY_ROUTING_KEY, data, {
                         headers: { "x-retries": retryCount + 1 }
                     });
                 }
@@ -71,16 +71,15 @@ export const consumerInboundOrderEvents = async () => {
 
         } catch (error) {
             console.error(`[p-s] Ciddi hata: ${error.message}`);
-            if (retryCount < 3) {
-                await publishEvent(ORDER_INBOUND_RETRY_EXCHANGE, ORDER_INBOUND_RETRY_ROUTING_KEY, envelope, {
-                    headers: { "x-retries": retryCount + 1 },
-                    messageId: id
-                });
-            } else {
-                await publishEvent(ORDER_INBOUND_DLQ_EXCHANGE, ORDER_INBOUND_DLQ_ROUTING_KEY, envelope, {
-                    messageId: id
-                });
-            }
+            await publishEvent(
+                retryCount < 3 ? ORDER_INBOUND_RETRY_EXCHANGE : ORDER_INBOUND_DLQ_EXCHANGE,
+                retryCount < 3 ? ORDER_INBOUND_RETRY_ROUTING_KEY : ORDER_INBOUND_DLQ_ROUTING_KEY,
+                data,
+                {
+                    messageId: messageId, // 'id' değil, 'messageId' olarak yolluyoruz
+                    headers: { "x-retries": retryCount + 1 }
+                }
+            );
             rabbitChannel.ack(msg);
         }
     });

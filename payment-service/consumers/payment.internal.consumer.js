@@ -2,7 +2,7 @@ import { rabbitChannel } from '../config/rabbitmq.js';
 
 import { publishEvent } from '../services/event.publisher.js';
 import Payment from '../model/Payment.model.js';
-import { PAYMENT_INTERNAL_DLQ_EXCHANGE, PAYMENT_INTERNAL_DLQ_ROUTING_KEY, PAYMENT_INTERNAL_QUEUE, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY } from '../messaging/constants.js';
+import { PAYMENT_EVENTS_EXCHANGE, PAYMENT_INTERNAL_DLQ_EXCHANGE, PAYMENT_INTERNAL_DLQ_ROUTING_KEY, PAYMENT_INTERNAL_QUEUE, PAYMENT_INTERNAL_RETRY_EXCHANGE, PAYMENT_INTERNAL_RETRY_ROUTING_KEY, PAYMENT_STATUS_EVENT } from '../messaging/constants.js';
 
 const FAKE_PAYMENT_SUCCESS_RATE = 0.5; // 50% success rate to test retries
 const MAX_RETRIES = 3;
@@ -27,13 +27,15 @@ export const consumePaymentEvents = async () => {
     rabbitChannel.consume(PAYMENT_INTERNAL_QUEUE, async (msg) => {
         if (msg === null) return;
 
-        let data = JSON.parse(msg.content.toString());
-        let payment;
-        const messageId = msg.properties.messageId || new Date().getTime().toString(); // Fallback for messageId
-        const retryCount = msg.properties.headers["x-retries"] || 0;
+        const envelope = JSON.parse(msg.content.toString());
+        const { data, id } = envelope; // CloudEvent'ten gelen id ve data
 
+        // Trace ID'yi yakala (Header'dan veya Zarfın içinden)
+        const traceId = msg.properties.headers?.["x-trace-id"] || id;
+        const messageId = msg.properties.messageId || id;
+        const retryCount = msg.properties.headers["x-retries"] || 0;
+        let payment;
         try {
-            data = JSON.parse(msg.content.toString());
             const { orderId, totalAmount } = data;
 
             // Basic validation
@@ -42,11 +44,12 @@ export const consumePaymentEvents = async () => {
                 await publishEvent(
                     PAYMENT_INTERNAL_DLQ_EXCHANGE,
                     PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
-                    msg.content,
-                    { messageId }
+                    data,
+                    { messageId: messageId }
                 );
                 return rabbitChannel.ack(msg);
             }
+
 
             // --- Idempotency Handling ---
             payment = await Payment.findOne({ orderId: orderId });
@@ -80,6 +83,7 @@ export const consumePaymentEvents = async () => {
             payment.paymentGatewayMessage = paymentResult.message;
             if (!payment.processedMessageIds.includes(messageId)) {
                 payment.processedMessageIds.push(messageId);
+                payment.processedMessageIds = payment.processedMessageIds.slice(-10);
             }
             await payment.save();
 
@@ -91,9 +95,8 @@ export const consumePaymentEvents = async () => {
                 {
                     orderId: payment.orderId,
                     status: payment.status,
-                    message: payment.paymentGatewayMessage,
                 },
-                { messageId }
+                { headers: { "x-trace-id": traceId }, messageId: messageId }
             );
 
             console.log(`[p-s] Successfully processed payment for orderId: ${orderId}`);
@@ -121,16 +124,15 @@ export const consumePaymentEvents = async () => {
                     {
                         orderId: data?.orderId || payment?.orderId,
                         status: 'PAYMENT_FAILURE', // Order servisi bunu alınca siparişi iptal edecek
-                        message: `Payment failed after ${MAX_RETRIES} attempts.`,
                     },
-                    { messageId }
+                    { headers: { "x-trace-id": traceId }, messageId: messageId }
                 );
 
                 await publishEvent(
                     PAYMENT_INTERNAL_DLQ_EXCHANGE,
                     PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
-                    msg.content,
-                    { messageId }
+                    data,
+                    { messageId: messageId }
                 );
                 return rabbitChannel.ack(msg);
             } else {
@@ -139,9 +141,9 @@ export const consumePaymentEvents = async () => {
                 await publishEvent(
                     PAYMENT_INTERNAL_RETRY_EXCHANGE,
                     PAYMENT_INTERNAL_RETRY_ROUTING_KEY,
-                    msg.content,
+                    data,
                     {
-                        headers: { "x-retries": retryCount + 1 },
+                        headers: { "x-retries": retryCount + 1, "x-trace-id": traceId },
                         messageId
                     });
                 return rabbitChannel.ack(msg); // Ack original message
