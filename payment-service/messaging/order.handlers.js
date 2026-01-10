@@ -15,12 +15,12 @@ export const handleOrderCreated = async (data, payment, messageId) => {
     // 2. Ödeme işlemini tetiklemek için İÇ KUYRUĞA mesaj at
     await publishEvent(
         PAYMENT_EVENTS_EXCHANGE, // Senin iç exchange'in
-        "payment.internal.proccess",
+        "payment.internal.process",
         { orderId: data.orderId, totalAmount: data.totalAmount },
         {
             type: "com.ecommerce.payment.process.start",
             headers: {
-                "trace-id": `tr-${messageId}}`
+                "x-trace-id": `${messageId}`
             }
         }
     );

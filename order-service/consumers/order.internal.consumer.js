@@ -11,7 +11,7 @@ export const consumeInternalOrderEvents = async () => {
         const data = JSON.parse(msg.content.toString());
         const retryCount = msg.properties.headers["x-retries"] || 0;
         const messageId = msg.properties.messageId;
-
+        const traceId = msg.properties.headers?.["x-trace-id"] || "no-trace-id"
 
         try {
             //VALİDATİON HATASI (TEKRARSIZ DİREKT DLQ)
@@ -19,7 +19,13 @@ export const consumeInternalOrderEvents = async () => {
                 rabbitChannel.publish(
                     ORDER_INTERNAL_DLQ_EXCHANGE,
                     ORDER_INTERNAL_DLQ_ROUTING_KEY,
-                    msg.content
+                    msg.content,
+                    {
+                        headers: {
+                            'x-retries': retryCount,
+                            'x-trace-id': traceId
+                        }
+                    }
                 );
                 rabbitChannel.ack(msg);
                 return;
@@ -32,12 +38,27 @@ export const consumeInternalOrderEvents = async () => {
             if (!order) {
                 if (retryCount >= 5) {
                     console.error(`Sipariş ${data.orderId} bulunamadı ve max retry doldu. DLQ'ya gidiyor.`);
-                    rabbitChannel.publish(ORDER_INTERNAL_DLQ_EXCHANGE, ORDER_INTERNAL_DLQ_ROUTING_KEY, msg.content);
+                    rabbitChannel.publish(
+                        ORDER_INTERNAL_DLQ_EXCHANGE,
+                        ORDER_INTERNAL_DLQ_ROUTING_KEY,
+                        msg.content, {
+                        headers: {
+                            'x-retries': retryCount,
+                            'x-trace-id': traceId
+                        }
+                    });
                 } else {
                     console.log(`Sipariş henüz DB'de yok, retry atılıyor... Sayı: ${retryCount + 1}`);
-                    rabbitChannel.publish(ORDER_INTERNAL_RETRY_EXCHANGE, ORDER_INTERNAL_RETRY_ROUTING_KEY, msg.content, {
-                        headers: { "x-retries": retryCount + 1 }
-                    });
+                    rabbitChannel.publish(
+                        ORDER_INTERNAL_RETRY_EXCHANGE,
+                        ORDER_INTERNAL_RETRY_ROUTING_KEY,
+                        msg.content,
+                        {
+                            headers: {
+                                'x-retries': retryCount + 1,
+                                'x-trace-id': traceId
+                            }
+                        });
                 }
                 return rabbitChannel.ack(msg);
             }
@@ -65,7 +86,13 @@ export const consumeInternalOrderEvents = async () => {
                 rabbitChannel.publish(
                     ORDER_INTERNAL_DLQ_EXCHANGE,
                     ORDER_INTERNAL_DLQ_ROUTING_KEY,
-                    msg.content
+                    msg.content,
+                    {
+                        headers: {
+                            'x-retries': retryCount,
+                            'x-trace-id': traceId
+                        }
+                    }
                 );
                 rabbitChannel.ack(msg);
                 return;
@@ -75,7 +102,12 @@ export const consumeInternalOrderEvents = async () => {
                     ORDER_INTERNAL_RETRY_EXCHANGE,
                     ORDER_INTERNAL_RETRY_ROUTING_KEY,
                     msg.content,
-                    { headers: { "x-retries": retryCount + 1 } }
+                    {
+                        headers: {
+                            'x-retries': retryCount + 1,
+                            'x-trace-id': traceId
+                        }
+                    }
                 )
             }
         }

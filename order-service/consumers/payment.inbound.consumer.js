@@ -1,5 +1,5 @@
 import { rabbitChannel } from '../config/rabbitmq.js';
-import { PAYMENT_INBOUND_DLQ_EXCHANGE, PAYMENT_INBOUND_DLQ_ROUTING_KEY, PAYMENT_INBOUND_QUEUE, PAYMENT_INBOUND_RETRY_EXCHANGE, PAYMENT_INBOUND_RETRY_ROUTING_KEY } from '../messaging/constants.js';
+import { PAYMENT_EVENTS_EXCHANGE, PAYMENT_INBOUND_DLQ_EXCHANGE, PAYMENT_INBOUND_DLQ_ROUTING_KEY, PAYMENT_INBOUND_QUEUE, PAYMENT_INBOUND_RETRY_EXCHANGE, PAYMENT_INBOUND_RETRY_ROUTING_KEY } from '../messaging/constants.js';
 import { Order } from '../model/Order.model.js';
 
 export const consumeInboundPaymentEvents = async () => {
@@ -16,6 +16,7 @@ export const consumeInboundPaymentEvents = async () => {
     const headers = msg.properties.headers || {};
     const retryCount = headers['x-retries'] || 0;
     const MAX_RETRIES = 3;
+    const traceId = msg.properties.headers?.["x-trace-id"] || "no-trace-id"
 
 
     //PAYMENT SERVİSDEN HATA GELİYOR payment.internal'ın catch'den
@@ -39,7 +40,12 @@ export const consumeInboundPaymentEvents = async () => {
         rabbitChannel.publish(
           PAYMENT_INBOUND_DLQ_EXCHANGE,
           PAYMENT_INBOUND_DLQ_ROUTING_KEY,
-          msg.content
+          msg.content, {
+          headers: {
+            "x-retries": retryCount,
+            "x-trace-id": traceId
+          }
+        }
         )
         return rabbitChannel.ack(msg);
       }
@@ -51,7 +57,13 @@ export const consumeInboundPaymentEvents = async () => {
           rabbitChannel.publish(
             PAYMENT_INBOUND_DLQ_EXCHANGE,
             PAYMENT_INBOUND_DLQ_ROUTING_KEY,
-            msg.content
+            msg.content,
+            {
+              headers: {
+                'x-retries': retryCount,
+                'x-trace-id': traceId
+              }
+            }
           );
           return rabbitChannel.ack(msg);
         } else {
@@ -59,7 +71,13 @@ export const consumeInboundPaymentEvents = async () => {
           rabbitChannel.publish(
             PAYMENT_INBOUND_RETRY_EXCHANGE,
             PAYMENT_INBOUND_RETRY_ROUTING_KEY,
-            msg.content
+            msg.content,
+            {
+              headers: {
+                'x-retries': retryCount + 1,
+                'x-trace-id': traceId
+              }
+            }
           )
           return rabbitChannel.ack(msg);
         }
@@ -101,6 +119,11 @@ export const consumeInboundPaymentEvents = async () => {
               orderId: orderId,
               status: 'PAYMENT_FAILURE', // Order bunu alınca siparişi iptal eder
               message: `Payment failed after ${MAX_RETRIES} attempts: ${error.message}`
+            },
+            {
+              headers: {
+                'x-trace-id': traceId
+              }
             }
           );
         }
@@ -111,7 +134,8 @@ export const consumeInboundPaymentEvents = async () => {
         rabbitChannel.publish(
           PAYMENT_INBOUND_DLQ_EXCHANGE,
           PAYMENT_INBOUND_DLQ_ROUTING_KEY,
-          msg.content
+          msg.content,
+          { headers: { 'x-retries': retryCount, 'x-trace-id': traceId } }
         );
         rabbitChannel.ack(msg);
 
@@ -120,7 +144,7 @@ export const consumeInboundPaymentEvents = async () => {
           PAYMENT_INBOUND_RETRY_EXCHANGE,
           PAYMENT_INBOUND_RETRY_ROUTING_KEY,
           msg.content,
-          { headers: { 'x-retries': retryCount + 1 } }
+          { headers: { 'x-retries': retryCount + 1, 'x-trace-id': traceId } }
         );
         rabbitChannel.ack(msg)
       }

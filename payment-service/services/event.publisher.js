@@ -8,14 +8,23 @@ export const publishEvent = async (exchange, routingKey, data, options = {}) => 
     return;
   }
 
+  const {
+    headers = {},
+    rabbitOptions = {},
+    type,
+    source,
+    messageId
+  } = options;
+
+
   try {
     // 1. 🛡️ ZARFLAMA (CloudEvent Formatı)
     // Eğer gelen data zaten bir zarf değilse, burada otomatik sarıyoruz.
     const cloudEventEnvelope = {
       specversion: "1.0",
-      id: options.messageId || uuidv4(), // Dışarıdan ID gelmezse biz üretiriz
-      type: options.type || `com.ecommerce.event.${routingKey}`, // Event tipi (opsiyonel)
-      source: options.source || "/services/payment-service",      // Kaynak servis
+      id: messageId || uuidv4(), // Dışarıdan ID gelmezse biz üretiriz
+      type: type || `com.ecommerce.event.${routingKey}`, // Event tipi (opsiyonel)
+      source: source || "/services/payment-service",      // Kaynak servis
       time: new Date().toISOString(),
       datacontenttype: "application/json",
       data: data // Asıl gönderdiğin obje buraya girer
@@ -23,13 +32,12 @@ export const publishEvent = async (exchange, routingKey, data, options = {}) => 
 
     const _data = Buffer.from(JSON.stringify(cloudEventEnvelope));
 
-    // 2. 🚀 PUBLISH
     rabbitChannel.publish(exchange, routingKey, _data, {
       persistent: true,
       contentType: 'application/json',
       messageId: cloudEventEnvelope.id, // RabbitMQ header'ına da ID'yi yazıyoruz
-      headers: options.headers || {},    // Retry/X-retries header'ları için
-      ...options
+      headers,    // Retry/X-retries header'ları için
+      ...rabbitOptions
     });
 
     console.log(`[p-s] [CloudEvent] '${routingKey}' anahtarıyla fırlatıldı. ID: ${cloudEventEnvelope.id}`);

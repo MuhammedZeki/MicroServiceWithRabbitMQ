@@ -1,7 +1,7 @@
 import "dotenv/config"
 import { app } from "./app.js";
 import { mongoClose, connectMongo } from "./config/mongo.js";
-import { startRabbitMQ } from "./config/rabbitmq.js";
+import { rabbitClose, startRabbitMQ } from "./config/rabbitmq.js";
 import { setupExchanges } from "./messaging/exchanges.js";
 import { setupQueues } from "./messaging/queues.js";
 import { setupBindings } from "./messaging/bindings.js";

@@ -36,7 +36,7 @@ export const publishOrderCreated = async (order) => {
             messageId: cloudEvent.id, // Takip barkodu
             persistent: true,         // Diske yaz (Garantiye al)
             headers: {
-                "trace-id": `tr-${uuidv4()}` // Tüm akışı takip edecek izleme ID'si
+                "x-trace-id": `${uuidv4()}` // Tüm akışı takip edecek izleme ID'si
             }
         }
     );
@@ -79,7 +79,7 @@ export const publishOrderCancelled = async (order) => {
         {
             messageId: cloudEvent.id,
             persistent: true,
-            headers: { "x-trace-id": `tr-${uuidv4()}` }
+            headers: { "x-trace-id": `${uuidv4()}` }
         }
     );
     console.log(`CloudEvent fırlatıldı (ID: ${cloudEvent.id})`)

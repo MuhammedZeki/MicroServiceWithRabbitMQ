@@ -34,6 +34,7 @@ export const consumePaymentEvents = async () => {
         const traceId = msg.properties.headers?.["x-trace-id"] || id;
         const messageId = msg.properties.messageId || id;
         const retryCount = msg.properties.headers["x-retries"] || 0;
+        const originalRoutingKey = msg.properties.headers?.['x-original-routing-key'] || PAYMENT_INTERNAL_QUEUE;
         let payment;
         try {
             const { orderId, totalAmount } = data;
@@ -45,7 +46,15 @@ export const consumePaymentEvents = async () => {
                     PAYMENT_INTERNAL_DLQ_EXCHANGE,
                     PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
                     data,
-                    { messageId: messageId }
+                    {
+                        messageId: messageId,
+                        headers: {
+                            'x-retries': retryCount,
+                            'x-trace-id': traceId,
+                            'x-original-routing-key': originalRoutingKey,
+                            'x-error': 'orderId or totalAmount is missing.'
+                        }
+                    }
                 );
                 return rabbitChannel.ack(msg);
             }
@@ -96,7 +105,12 @@ export const consumePaymentEvents = async () => {
                     orderId: payment.orderId,
                     status: payment.status,
                 },
-                { headers: { "x-trace-id": traceId }, messageId: messageId }
+                {
+                    messageId: messageId,
+                    headers: {
+                        'x-trace-id': traceId
+                    },
+                }
             );
 
             console.log(`[p-s] Successfully processed payment for orderId: ${orderId}`);
@@ -125,14 +139,27 @@ export const consumePaymentEvents = async () => {
                         orderId: data?.orderId || payment?.orderId,
                         status: 'PAYMENT_FAILURE', // Order servisi bunu alınca siparişi iptal edecek
                     },
-                    { headers: { "x-trace-id": traceId }, messageId: messageId }
+                    {
+                        messageId: messageId,
+                        headers: {
+                            'x-trace-id': traceId
+                        }
+                    }
                 );
 
                 await publishEvent(
                     PAYMENT_INTERNAL_DLQ_EXCHANGE,
                     PAYMENT_INTERNAL_DLQ_ROUTING_KEY,
                     data,
-                    { messageId: messageId }
+                    {
+                        messageId: messageId,
+                        headers: {
+                            'x-retries': retryCount,
+                            'x-trace-id': traceId,
+                            'x-original-routing-key': originalRoutingKey,
+                            'x-error': error.message
+                        },
+                    }
                 );
                 return rabbitChannel.ack(msg);
             } else {
@@ -143,8 +170,13 @@ export const consumePaymentEvents = async () => {
                     PAYMENT_INTERNAL_RETRY_ROUTING_KEY,
                     data,
                     {
-                        headers: { "x-retries": retryCount + 1, "x-trace-id": traceId },
-                        messageId
+                        headers: {
+                            'x-retries': retryCount + 1,
+                            'x-trace-id': traceId,
+                            'x-original-routing-key': originalRoutingKey,
+                            'x-error': error.message
+                        },
+                        messageId: messageId
                     });
                 return rabbitChannel.ack(msg); // Ack original message
             }

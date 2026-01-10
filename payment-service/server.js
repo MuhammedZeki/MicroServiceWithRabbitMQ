@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { app, startMessaging } from './app.js';
 import { mongoClose, connectMongo } from './config/mongo.js';
-import { startRabbitMQ } from './config/rabbitmq.js';
+import { rabbitClose, startRabbitMQ } from './config/rabbitmq.js';
 
 const PORT = process.env.PAYMENT_SERVICE_PORT || 3002;
 
